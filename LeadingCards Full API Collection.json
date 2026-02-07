@@ -1,0 +1,680 @@
+{
+	"info": {
+		"_postman_id": "7e0f3c39-de85-4bb8-83db-873513defd54",
+		"name": "Cards management",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25223192"
+	},
+	"item": [
+		{
+			"name": "Billing Address - Create",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"first_name\": \"Hue\",\r\n    \"last_name\": \"Spark\",\r\n    \"phone_number\": \"00651565454\",\r\n    \"address\": \"Baker street 221b\",\r\n    \"city\": \"London\",\r\n    \"country\": \"England\",\r\n    \"zip\": \"EC1A 1BB\",\r\n    \"is_default\": true\r\n}\r\n\r\n\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/billing_addresses/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"billing_addresses",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Billing Addresses - List",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/billing_addresses/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"billing_addresses",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Billing Addresses - Edit",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \r\n    \r\n    \"phone_number\": \"054551545\"\r\n    \r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/billing_addresses/6678a3cc-0bcc-40e3-8f50-89128ff155d2/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"billing_addresses",
+						"6678a3cc-0bcc-40e3-8f50-89128ff155d2",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Billing Address - Delete",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/billing_addresses/79977ecf-2b9b-40e8-85f7-63f524425547/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"billing_addresses",
+						"79977ecf-2b9b-40e8-85f7-63f524425547",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Tags - List",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/tags/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"tags",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Bins - List",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/cards/bins/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"cards",
+						"bins",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cards - Create",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"bin_uuid\": \"8d347b86-5cbb-4ae5-8b21-1412141b39ce\",\r\n    \"limit\": 10,\r\n    \"comment\": \"comment\",\r\n    \"exp_month\": 9,\r\n    \"exp_year\": 2025,\r\n    \"amount\": 1,\r\n\t\t\"tags\":[\r\n\t\t\t\"Optional\", \"tags\"\r\n\t\t],\r\n  \r\n\t// Address:\r\n\t  \"billing_address_uuid\": \"dbcdc121-f486-467e-869d-4a3cecb7612c\"\r\n    // Usage without billing address:\r\n    // \"first_name\": \"\",\r\n    // \"last_name\": \"\",\r\n    // \"address1\": \"\",\r\n    // \"city\": \"\",\r\n    // \"state\": \"\",\r\n    // \"zip\": \"\",\r\n    // \"country_iso\": \"\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/cards/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"cards",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cards - List",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/cards/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"cards",
+						""
+					],
+					"query": [
+						{
+							"key": "tags",
+							"value": "",
+							"description": "UUIDs splitted by ,",
+							"disabled": true
+						},
+						{
+							"key": "bin_uuid",
+							"value": "",
+							"description": "UUIDs splitted by ,",
+							"disabled": true
+						},
+						{
+							"key": "count",
+							"value": "150",
+							"disabled": true
+						},
+						{
+							"key": "ordering",
+							"value": "-date_entered_utc",
+							"disabled": true
+						},
+						{
+							"key": "status",
+							"value": "ACTIVE",
+							"description": "ACTIVE / BLOCKED / ALL",
+							"disabled": true
+						},
+						{
+							"key": "q",
+							"value": "",
+							"description": "ID, last 4 digits, name",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cards - Get Details",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/cards/:card_uuid/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"cards",
+						":card_uuid",
+						""
+					],
+					"variable": [
+						{
+							"key": "card_uuid",
+							"value": ""
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cards - Get Full Details",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token f6a7729855f7c83affbc1cd2fed8d22ad247ff2e"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/cards/:card_uuid/full_card_details_cns4_8iib_2o_23g_kdv_ca/?team_uuid=ec76016d-3e17-485d-826f-695416ff19ba",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"cards",
+						":card_uuid",
+						"full_card_details_cns4_8iib_2o_23g_kdv_ca",
+						""
+					],
+					"query": [
+						{
+							"key": "team_uuid",
+							"value": "ec76016d-3e17-485d-826f-695416ff19ba"
+						}
+					],
+					"variable": [
+						{
+							"key": "card_uuid",
+							"value": "94a63ec1-cd3c-4098-8a60-0f94e045fa19"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cards - Block",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/cards/:card_uuid/block",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"cards",
+						":card_uuid",
+						"block"
+					],
+					"variable": [
+						{
+							"key": "card_uuid",
+							"value": ""
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cards - Activate",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/cards/:card_uuid/activate",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"cards",
+						":card_uuid",
+						"activate"
+					],
+					"variable": [
+						{
+							"key": "card_uuid",
+							"value": ""
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cards - Change Limit",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"limit\": \"15\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/cards/:card_uuid/change_limit",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"cards",
+						":card_uuid",
+						"change_limit"
+					],
+					"variable": [
+						{
+							"key": "card_uuid",
+							"value": ""
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Transactions - list",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/transactions?from_date=2024-10-01",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"transactions"
+					],
+					"query": [
+						{
+							"key": "from_date",
+							"value": "2024-10-01"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Teams - list",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/teams/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"teams",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Teams - slimlist",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/teams/",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"teams",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Team - members list",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token {{token}}"
+					}
+				],
+				"url": {
+					"raw": "https://app.leadingcards.media/v1/teams/:team_uuid/members",
+					"protocol": "https",
+					"host": [
+						"app",
+						"leadingcards",
+						"media"
+					],
+					"path": [
+						"v1",
+						"teams",
+						":team_uuid",
+						"members"
+					],
+					"variable": [
+						{
+							"key": "team_uuid",
+							"value": "team_uuid_here"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "token",
+			"value": "TOKEN HERE"
+		}
+	]
+}

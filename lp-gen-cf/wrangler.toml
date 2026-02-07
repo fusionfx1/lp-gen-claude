@@ -1,0 +1,14 @@
+name = "lp-factory-api"
+main = "src/worker.js"
+compatibility_date = "2024-12-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "lp-factory-beta"
+database_id = "fbe76b2d-3f34-4f6d-a1f1-32ec9962a4e0" # ← ใส่หลังสร้าง D1 แล้ว
+
+# Optional: custom domain
+# [routes]
+# pattern = "api.yourdomain.com/*"
+# zone_name = "yourdomain.com"
