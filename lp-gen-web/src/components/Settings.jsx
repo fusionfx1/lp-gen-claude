@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { THEME as T } from "../constants";
 import { Card, Inp, Btn, Sel } from "./Atoms";
 import { api } from "../services/api";
+import { multiloginApi } from "../services/multilogin";
 
 export function Settings({ settings, setSettings, stats }) {
     const [apiKey, setApiKey] = useState(settings.apiKey || "");
@@ -16,6 +17,7 @@ export function Settings({ settings, setSettings, stats }) {
     const [mlPassword, setMlPassword] = useState(settings.mlPassword || "");
     const [mlFolderId, setMlFolderId] = useState(settings.mlFolderId || "");
     const [defaultProxyProvider, setDefaultProxyProvider] = useState(settings.defaultProxyProvider || "multilogin");
+    const [generatingToken, setGeneratingToken] = useState(false);
     const [testing, setTesting] = useState(null);
     const [testResult, setTestResult] = useState({});
 
@@ -182,6 +184,21 @@ export function Settings({ settings, setSettings, stats }) {
                 )}
                 <div style={{ display: "flex", gap: 6 }}>
                     <Btn variant="ghost" onClick={testMl} disabled={testing === "ml"} style={{ fontSize: 12 }}>{testing === "ml" ? "..." : "🔑 Test / Sign In"}</Btn>
+                    <Btn variant="ghost" onClick={async () => {
+                        setGeneratingToken(true);
+                        try {
+                            const res = await multiloginApi.getAutomationToken();
+                            if (res.data?.token) {
+                                setMlToken(res.data.token);
+                                setTestResult(p => ({ ...p, ml: "ok" }));
+                            } else if (res.error) {
+                                setTestResult(p => ({ ...p, ml: "fail" }));
+                            }
+                        } catch { setTestResult(p => ({ ...p, ml: "fail" })); }
+                        setGeneratingToken(false);
+                    }} disabled={!mlToken && !mlEmail || generatingToken} style={{ fontSize: 12 }}>
+                        {generatingToken ? "..." : "🔑 Generate Token"}
+                    </Btn>
                     <Btn onClick={() => save({ mlToken, mlEmail, mlPassword, mlFolderId, defaultProxyProvider })} style={{ fontSize: 12 }}>💾 Save Multilogin Config</Btn>
                 </div>
             </Card>

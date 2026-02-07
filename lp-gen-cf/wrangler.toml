@@ -5,8 +5,8 @@ compatibility_date = "2024-12-01"
 # D1 Database binding
 [[d1_databases]]
 binding = "DB"
-database_name = "lp-factory-beta"
-database_id = "fbe76b2d-3f34-4f6d-a1f1-32ec9962a4e0" # ← ใส่หลังสร้าง D1 แล้ว
+database_name = "ppc-gen-claude"
+database_id = "7d31d941-f863-46f5-99c2-2179de821573" # ← ใส่หลังสร้าง D1 แล้ว
 
 # Optional: custom domain
 # [routes]

@@ -22,4 +22,22 @@ export const multiloginApi = {
     async cloneProfile(profileId) {
         return api.post(`/ml/profiles/${profileId}/clone`, {});
     },
+    async getAutomationToken() {
+        return api.post('/mlx/automation-token', {});
+    },
+    async getFolders() {
+        return api.get('/mlx/folders');
+    },
+    async updateProfile(data) {
+        return api.patch('/mlx/profiles/update', data);
+    },
+    async deleteProfiles(ids, folderId) {
+        return api.delBody('/mlx/profiles/delete', { ids, folderId });
+    },
+    async getActiveProfiles() {
+        return api.get('/mlx/profiles/active');
+    },
+    async syncProfiles() {
+        return api.post('/mlx/profiles/sync', {});
+    },
 };

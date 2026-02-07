@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS ops_domains (
   registrar TEXT DEFAULT '',
   account_id TEXT DEFAULT '',
   profile_id TEXT DEFAULT '',
+  cf_account_id TEXT DEFAULT '',
   status TEXT DEFAULT 'active',
   created_at TEXT DEFAULT (datetime('now'))
 );
@@ -95,14 +96,20 @@ CREATE TABLE IF NOT EXISTS ops_profiles (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   proxy_ip TEXT DEFAULT '',
-  browser_type TEXT DEFAULT '',
-  os TEXT DEFAULT '',
+  browser_type TEXT DEFAULT 'mimic',
+  os TEXT DEFAULT 'windows',
   ml_profile_id TEXT DEFAULT '',
   ml_folder_id TEXT DEFAULT '',
   proxy_host TEXT DEFAULT '',
   proxy_port TEXT DEFAULT '',
   proxy_user TEXT DEFAULT '',
+  proxy_pass TEXT DEFAULT '',
+  proxy_type TEXT DEFAULT 'http',
   fingerprint_os TEXT DEFAULT 'windows',
+  mlx_status TEXT DEFAULT 'stopped',
+  last_started_at TEXT DEFAULT '',
+  last_stopped_at TEXT DEFAULT '',
+  account_id TEXT DEFAULT '',
   status TEXT DEFAULT 'active',
   created_at TEXT DEFAULT (datetime('now'))
 );
@@ -128,6 +135,15 @@ CREATE TABLE IF NOT EXISTS ops_logs (
   id TEXT PRIMARY KEY,
   msg TEXT NOT NULL,
   created_by TEXT DEFAULT '',
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- ═══ CF ACCOUNTS ═══
+CREATE TABLE IF NOT EXISTS cf_accounts (
+  id TEXT PRIMARY KEY,
+  email TEXT DEFAULT '',
+  api_key TEXT DEFAULT '',
+  label TEXT DEFAULT '',
   created_at TEXT DEFAULT (datetime('now'))
 );
 

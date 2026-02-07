@@ -57,6 +57,7 @@ export function OpsCenter({ data, add, del, upd, settings }) {
     const [wizardStep, setWizardStep] = useState(0);
     const [wizardData, setWizardData] = useState({});
     const [statusMsg, setStatusMsg] = useState(null);            // { msg, type }
+    const [syncing, setSyncing] = useState(false);
 
     /* ─── Flash a status message for 3s ──────────────────────────────── */
     const flash = (msg, type = "success") => {
@@ -86,6 +87,24 @@ export function OpsCenter({ data, add, del, upd, settings }) {
                 .catch(() => { })
                 .finally(() => setMlLoading(false));
         }
+    }, [tab]);
+
+    useEffect(() => {
+        if (tab !== "profiles") return;
+        const poll = setInterval(() => {
+            multiloginApi.getActiveProfiles()
+                .then(res => {
+                    const activeIds = (res || []).map(p => p.mlProfileId);
+                    // Update mlProfiles status based on active list
+                    setMlProfiles(prev => prev.map(p => {
+                        const pid = p.uuid || p.id;
+                        const isActive = activeIds.includes(pid);
+                        return { ...p, status: isActive ? "running" : (p.status === "running" ? "stopped" : p.status) };
+                    }));
+                })
+                .catch(() => {});
+        }, 30000);
+        return () => clearInterval(poll);
     }, [tab]);
 
     /* ─── Refresh helpers ────────────────────────────────────────────── */
@@ -498,37 +517,81 @@ export function OpsCenter({ data, add, del, upd, settings }) {
                 TAB: PROFILES (Task 8)
                 ═══════════════════════════════════════════════════════════ */}
             {tab === "profiles" && <>
-                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                    <Btn onClick={() => setModal("profile")}>+ Add Profile (Local)</Btn>
-                    <Btn variant="ghost" onClick={() => setModal("ml-create")}>+ Quick ML Profile</Btn>
+                {/* Action buttons */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                    <Btn onClick={() => setModal("mlx-create")}>+ Create Profile</Btn>
+                    <Btn variant="ghost" onClick={async () => {
+                        setSyncing(true);
+                        try {
+                            const res = await multiloginApi.syncProfiles();
+                            if (res.error) { flash(`Sync failed: ${res.error}`, "error"); }
+                            else { flash(`Synced: ${res.created || 0} created, ${res.deleted || 0} removed`); }
+                            await refreshProfiles();
+                        } catch (e) { flash(`Sync failed: ${e.message}`, "error"); }
+                        finally { setSyncing(false); }
+                    }}>{syncing ? "Syncing..." : "\uD83D\uDD04 Sync from MLX"}</Btn>
                     <Btn variant="ghost" onClick={() => {
                         setMlLoading(true);
                         refreshProfiles().finally(() => setMlLoading(false));
-                    }} style={{ fontSize: 11 }}>🔄 Refresh</Btn>
+                    }} style={{ fontSize: 11 }}>↻ Refresh</Btn>
+                    <Btn variant="danger" onClick={async () => {
+                        if (!confirm("Stop all running profiles?")) return;
+                        const running = mlProfiles.filter(p => p.status === "running" || p.status === "started");
+                        for (const p of running) {
+                            const pid = p.uuid || p.id;
+                            await multiloginApi.stopProfile(pid).catch(() => {});
+                        }
+                        await refreshProfiles();
+                        flash(`Stopped ${running.length} profiles`);
+                    }} style={{ fontSize: 11, marginLeft: "auto" }}>⏹ Stop All</Btn>
                 </div>
 
-                {/* Multilogin profiles from API */}
-                <div style={S.sectionTitle}>Multilogin Profiles</div>
+                {/* Unified profile list */}
                 {mlLoading ? <div style={S.emptyState}>Loading profiles...</div> : (
-                    <div style={{ marginTop: 8 }}>
+                    <div>
+                        {/* Header row */}
+                        <div style={{ display: "flex", padding: "6px 12px", fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                            <div style={{ flex: 2 }}>Name</div>
+                            <div style={{ flex: 1.2 }}>MLX ID</div>
+                            <div style={{ flex: 0.8 }}>Browser</div>
+                            <div style={{ flex: 0.8 }}>OS</div>
+                            <div style={{ flex: 1.5 }}>Proxy</div>
+                            <div style={{ flex: 0.8 }}>Status</div>
+                            <div style={{ flex: 1.5, textAlign: "right" }}>Actions</div>
+                        </div>
+
                         {mlProfiles.length === 0
-                            ? <div style={S.emptyState}>No Multilogin profiles found</div>
+                            ? <div style={S.emptyState}>No profiles found. Click "Sync from MLX" or create a new profile.</div>
                             : mlProfiles.map(p => {
                                 const pid = p.uuid || p.id;
                                 const isRunning = p.status === "running" || p.status === "started";
+                                const proxyInfo = p.parameters?.proxy?.host
+                                    ? `${p.parameters.proxy.host}:${p.parameters.proxy.port || ""}`
+                                    : p.proxy || "\u2014";
+                                // Find linked D1 profile
+                                const d1Profile = data.profiles.find(dp => dp.mlProfileId === pid);
                                 return (
-                                    <div key={pid} style={S.row}>
-                                        <div style={{ flex: 2, fontWeight: 600, fontSize: 12 }}>{p.name || pid}</div>
-                                        <div style={{ flex: 1, fontSize: 11 }}>
-                                            <Dot c={isRunning ? T.success : T.dim} label={isRunning ? "Running" : "Stopped"} />
+                                    <div key={pid} style={{ ...S.row, padding: "10px 12px" }}>
+                                        <div style={{ flex: 2, fontWeight: 600, fontSize: 12 }}>
+                                            {p.name || pid.slice(0, 12)}
+                                            {d1Profile?.accountId && <span style={{ marginLeft: 6, fontSize: 9, color: T.dim, background: T.card2, padding: "1px 5px", borderRadius: 3 }}>A:{d1Profile.accountId.slice(0, 6)}</span>}
                                         </div>
-                                        <div style={{ flex: 1.5, fontSize: 11, color: T.muted }}>
-                                            {p.parameters?.proxy?.host ? `${p.parameters.proxy.host}:${p.parameters.proxy.port || ""}` : p.proxy || "\u2014"}
+                                        <div style={{ flex: 1.2, fontSize: 10, color: T.muted, fontFamily: "monospace" }}>
+                                            {pid.slice(0, 10)}...
                                         </div>
-                                        <div style={{ flex: 1, fontSize: 11, color: T.muted }}>
-                                            {p.browser_type || p.parameters?.flags?.navigator_masking?.browser_type || "\u2014"}
+                                        <div style={{ flex: 0.8, fontSize: 11, color: T.muted }}>
+                                            {p.browser_type || d1Profile?.browserType || "\u2014"}
                                         </div>
-                                        <div style={{ display: "flex", gap: 4 }}>
+                                        <div style={{ flex: 0.8, fontSize: 11, color: T.muted }}>
+                                            {p.os_type || d1Profile?.os || "\u2014"}
+                                        </div>
+                                        <div style={{ flex: 1.5, fontSize: 10, color: T.muted, fontFamily: "monospace" }}>
+                                            {proxyInfo}
+                                        </div>
+                                        <div style={{ flex: 0.8 }}>
+                                            <Dot c={isRunning ? T.success : "#666"} label={isRunning ? "Running" : "Stopped"} />
+                                        </div>
+                                        <div style={{ flex: 1.5, display: "flex", gap: 3, justifyContent: "flex-end" }}>
                                             {isRunning ? (
                                                 <Btn variant="danger" onClick={() => {
                                                     multiloginApi.stopProfile(pid).then(() => {
@@ -550,6 +613,14 @@ export function OpsCenter({ data, add, del, upd, settings }) {
                                                     flash("Profile cloned");
                                                 }).catch(e => flash(`Clone failed: ${e.message}`, "error"));
                                             }} style={S.miniBtn}>Clone</Btn>
+                                            <Btn variant="ghost" onClick={() => {
+                                                if (!confirm(`Delete profile "${p.name || pid}"?`)) return;
+                                                const folderId = p.folder_id || settings.mlFolderId || "";
+                                                multiloginApi.deleteProfiles([pid], folderId).then(() => {
+                                                    refreshProfiles();
+                                                    flash("Profile deleted");
+                                                }).catch(e => flash(`Delete failed: ${e.message}`, "error"));
+                                            }} style={{ ...S.miniBtn, color: T.danger }}>Del</Btn>
                                         </div>
                                     </div>
                                 );
@@ -557,40 +628,43 @@ export function OpsCenter({ data, add, del, upd, settings }) {
                     </div>
                 )}
 
-                {/* Local profiles from D1 */}
-                <div style={{ ...S.sectionTitle, marginTop: 24 }}>Local Profiles (D1)</div>
-                <ListTable items={data.profiles} coll="profiles" cols={[
-                    { key: "name", flex: 2 },
-                    { key: "proxyIp", render: i => i.proxyIp || i.proxyHost || "\u2014" },
-                    { key: "browserType" },
-                    { key: "mlProfileId", render: i => i.mlProfileId ? <Badge color={T.primary}>ML: {i.mlProfileId.slice(0, 8)}...</Badge> : <span style={{ color: T.dim }}>Not linked</span> },
-                ]} />
+                {/* D1 profiles (unlinked) */}
+                {data.profiles.filter(p => !mlProfiles.some(mp => (mp.uuid || mp.id) === p.mlProfileId)).length > 0 && <>
+                    <div style={{ ...S.sectionTitle, marginTop: 24, fontSize: 11, color: T.dim }}>Local Only (not linked to MLX)</div>
+                    <ListTable items={data.profiles.filter(p => !mlProfiles.some(mp => (mp.uuid || mp.id) === p.mlProfileId))} coll="profiles" cols={[
+                        { key: "name", flex: 2 },
+                        { key: "proxyIp", render: i => i.proxyIp || i.proxyHost || "\u2014" },
+                        { key: "browserType" },
+                        { key: "mlProfileId", render: i => i.mlProfileId ? <Badge color={T.primary}>ML: {i.mlProfileId.slice(0, 8)}...</Badge> : <span style={{ color: T.dim }}>Not linked</span> },
+                    ]} />
+                </>}
 
-                {/* Add local profile */}
-                {modal === "profile" && <AddModal title="Add Profile (Local)" coll="profiles" fields={[
-                    { key: "name", label: "Profile Name", ph: "Profile US-1" },
-                    { key: "proxyIp", label: "Proxy IP", ph: "123.45.67.89" },
-                    { key: "browserType", label: "Browser Type", options: ["Mimic", "Stealthfox", "Custom"] },
-                    { key: "mlProfileId", label: "ML Profile ID (optional)", ph: "uuid from Multilogin" },
-                ]} />}
-
-                {/* Quick create ML profile modal (Task 8) */}
-                {modal === "ml-create" && (() => {
-                    const MLCreateModal = () => {
+                {/* Enhanced Create Profile Modal */}
+                {modal === "mlx-create" && (() => {
+                    const MLXCreateModal = () => {
                         const [form, setForm] = useState({
+                            name: "",
                             browser_type: "mimic",
                             os_type: "windows",
                             proxy_host: "",
                             proxy_port: "",
                             proxy_user: "",
                             proxy_pass: "",
+                            proxy_type: "http",
                             start_urls: "",
+                            accountId: "",
                         });
                         const [creating, setCreating] = useState(false);
                         return (
                             <div style={S.overlay}>
-                                <Card style={{ width: 480, padding: 24, animation: "fadeIn .2s" }}>
-                                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Create Quick ML Profile</h3>
+                                <Card style={{ width: 520, padding: 24, animation: "fadeIn .2s", maxHeight: "85vh", overflowY: "auto" }}>
+                                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Create MLX Profile</h3>
+
+                                    <div style={S.fieldWrap}>
+                                        <label style={S.label}>Profile Name</label>
+                                        <Inp value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="Account-01" />
+                                    </div>
+
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                                         <div style={S.fieldWrap}>
                                             <label style={S.label}>Browser Type</label>
@@ -608,8 +682,9 @@ export function OpsCenter({ data, add, del, upd, settings }) {
                                             </select>
                                         </div>
                                     </div>
+
                                     <div style={{ ...S.sectionTitle, marginTop: 12, fontSize: 11 }}>Proxy Settings</div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 12 }}>
                                         <div style={S.fieldWrap}>
                                             <label style={S.label}>Host</label>
                                             <Inp value={form.proxy_host} onChange={v => setForm({ ...form, proxy_host: v })} placeholder="proxy.example.com" />
@@ -618,46 +693,84 @@ export function OpsCenter({ data, add, del, upd, settings }) {
                                             <label style={S.label}>Port</label>
                                             <Inp value={form.proxy_port} onChange={v => setForm({ ...form, proxy_port: v })} placeholder="8080" />
                                         </div>
+                                        <div style={S.fieldWrap}>
+                                            <label style={S.label}>Type</label>
+                                            <select value={form.proxy_type} onChange={e => setForm({ ...form, proxy_type: e.target.value })} style={S.select}>
+                                                <option value="http">HTTP</option>
+                                                <option value="socks5">SOCKS5</option>
+                                            </select>
+                                        </div>
                                     </div>
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                                         <div style={S.fieldWrap}>
-                                            <label style={S.label}>Username</label>
+                                            <label style={S.label}>Proxy Username</label>
                                             <Inp value={form.proxy_user} onChange={v => setForm({ ...form, proxy_user: v })} placeholder="user" />
                                         </div>
                                         <div style={S.fieldWrap}>
-                                            <label style={S.label}>Password</label>
+                                            <label style={S.label}>Proxy Password</label>
                                             <Inp value={form.proxy_pass} onChange={v => setForm({ ...form, proxy_pass: v })} type="password" placeholder="pass" />
                                         </div>
                                     </div>
+
                                     <div style={S.fieldWrap}>
-                                        <label style={S.label}>Start URLs (comma-separated)</label>
-                                        <Inp value={form.start_urls} onChange={v => setForm({ ...form, start_urls: v })} placeholder="https://google.com, https://facebook.com" />
+                                        <label style={S.label}>Custom Start URLs (one per line)</label>
+                                        <textarea value={form.start_urls} onChange={e => setForm({ ...form, start_urls: e.target.value })} placeholder={"https://ads.google.com\nhttps://business.facebook.com"} rows={3}
+                                            style={{ ...S.select, resize: "vertical", minHeight: 60 }} />
                                     </div>
+
+                                    <div style={S.fieldWrap}>
+                                        <label style={S.label}>Link to Account (optional)</label>
+                                        <select value={form.accountId} onChange={e => setForm({ ...form, accountId: e.target.value })} style={S.select}>
+                                            <option value="">None</option>
+                                            {data.accounts.map(a => <option key={a.id} value={a.id}>{a.label || a.email || a.id}</option>)}
+                                        </select>
+                                    </div>
+
                                     <div style={S.btnRow}>
                                         <Btn variant="ghost" onClick={() => setModal(null)}>Cancel</Btn>
                                         <Btn disabled={creating} onClick={async () => {
                                             setCreating(true);
                                             try {
+                                                const folderId = settings.mlFolderId || "";
                                                 const profileData = {
                                                     browser_type: form.browser_type,
+                                                    folder_id: folderId,
+                                                    name: form.name || `Profile-${uid().slice(0, 6)}`,
                                                     os_type: form.os_type,
                                                     parameters: {
                                                         proxy: form.proxy_host ? {
                                                             host: form.proxy_host,
+                                                            type: form.proxy_type,
                                                             port: parseInt(form.proxy_port) || 8080,
                                                             username: form.proxy_user,
                                                             password: form.proxy_pass,
-                                                            type: "http",
                                                         } : undefined,
+                                                        flags: {
+                                                            navigator_masking: "mask",
+                                                            audio_masking: "mask",
+                                                            localization_masking: "mask",
+                                                            geolocation_popup: "prompt",
+                                                            geolocation_masking: "mask",
+                                                            timezone_masking: "mask",
+                                                            canvas_noise: "natural",
+                                                            graphics_noise: "natural",
+                                                            graphics_masking: "mask",
+                                                            webrtc_masking: "natural",
+                                                            fonts_masking: "mask",
+                                                            media_devices_masking: "mask",
+                                                            screen_masking: "mask",
+                                                            ports_masking: "mask",
+                                                        },
+                                                        custom_start_urls: form.start_urls ? form.start_urls.split("\n").map(u => u.trim()).filter(Boolean) : undefined,
                                                     },
-                                                    start_urls: form.start_urls ? form.start_urls.split(",").map(u => u.trim()).filter(Boolean) : undefined,
                                                 };
-                                                await multiloginApi.createProfile(profileData);
+                                                const res = await multiloginApi.createProfile(profileData);
+                                                if (res.error) throw new Error(res.error);
                                                 await refreshProfiles();
                                                 setModal(null);
-                                                flash("ML profile created");
+                                                flash("Profile created in MLX + D1");
                                             } catch (e) {
-                                                flash(`Create failed: ${e.message}`, "error");
+                                                flash(`Create failed: ${e.message || e.detail || "Unknown error"}`, "error");
                                             } finally {
                                                 setCreating(false);
                                             }
@@ -667,7 +780,7 @@ export function OpsCenter({ data, add, del, upd, settings }) {
                             </div>
                         );
                     };
-                    return <MLCreateModal />;
+                    return <MLXCreateModal />;
                 })()}
             </>}
 

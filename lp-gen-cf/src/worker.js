@@ -3,7 +3,7 @@
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, anthropic-version, anthropic-dangerous-direct-browser-access',
   'Access-Control-Max-Age': '86400',
 };
@@ -40,7 +40,7 @@ function camelToSnake(str) {
 // Column whitelists for PUT endpoints (SQL injection protection)
 const ALLOWED_COLS = {
   accounts: new Set(['label', 'email', 'paymentId', 'budget', 'status', 'cardUuid', 'cardLast4', 'cardStatus', 'profileId', 'proxyIp', 'monthlySpend']),
-  profiles: new Set(['name', 'proxyIp', 'browserType', 'os', 'status', 'mlProfileId', 'mlFolderId', 'proxyHost', 'proxyPort', 'proxyUser', 'fingerprintOs']),
+  profiles: new Set(['name', 'proxyIp', 'browserType', 'os', 'status', 'mlProfileId', 'mlFolderId', 'proxyHost', 'proxyPort', 'proxyUser', 'fingerprintOs', 'proxyPass', 'proxyType', 'mlxStatus', 'lastStartedAt', 'lastStoppedAt', 'accountId']),
   payments: new Set(['label', 'type', 'last4', 'bankName', 'status', 'lcCardUuid', 'lcBinUuid', 'cardLimit', 'cardExpiry', 'totalSpend']),
 };
 
@@ -240,9 +240,10 @@ export default {
       if (path === '/api/ops/profiles' && method === 'POST') {
         const body = await request.json();
         const id = uid();
-        await db.prepare('INSERT INTO ops_profiles (id, name, proxy_ip, browser_type, os, status, ml_profile_id, ml_folder_id, proxy_host, proxy_port, proxy_user, fingerprint_os) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        await db.prepare('INSERT INTO ops_profiles (id, name, proxy_ip, browser_type, os, status, ml_profile_id, ml_folder_id, proxy_host, proxy_port, proxy_user, fingerprint_os, proxy_pass, proxy_type, mlx_status, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
           .bind(id, body.name || '', body.proxyIp || '', body.browserType || '', body.os || '', body.status || 'active',
-            body.mlProfileId || '', body.mlFolderId || '', body.proxyHost || '', body.proxyPort || '', body.proxyUser || '', body.fingerprintOs || '').run();
+            body.mlProfileId || '', body.mlFolderId || '', body.proxyHost || '', body.proxyPort || '', body.proxyUser || '', body.fingerprintOs || '',
+            body.proxyPass || '', body.proxyType || '', body.mlxStatus || '', body.accountId || '').run();
         await db.prepare('INSERT INTO ops_logs (id, msg) VALUES (?, ?)').bind(uid(), `Added profile: ${body.name}`).run();
         return json({ id, success: true }, 201);
       }
@@ -602,6 +603,23 @@ export default {
           body: JSON.stringify(body),
         });
         const data = await res.json();
+        // Also create a D1 ops_profiles record for the newly created MLX profile
+        if (res.ok && data.data?.ids?.length) {
+          for (const mlxId of data.data.ids) {
+            const id = uid();
+            const proxyInfo = body.parameters?.proxy || {};
+            await db.prepare(
+              'INSERT INTO ops_profiles (id, name, ml_profile_id, ml_folder_id, browser_type, os, proxy_host, proxy_port, proxy_user, proxy_pass, proxy_type, fingerprint_os, mlx_status, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            ).bind(
+              id, body.name || '', mlxId, body.folder_id || ml.mlFolderId || '',
+              body.browser_type || '', body.parameters?.fingerprint?.os || '',
+              proxyInfo.host || '', proxyInfo.port || '', proxyInfo.username || '', proxyInfo.password || '',
+              proxyInfo.type || '', body.parameters?.fingerprint?.os || '',
+              'stopped', 'active'
+            ).run();
+            await db.prepare('INSERT INTO ops_logs (id, msg) VALUES (?, ?)').bind(uid(), `MLX profile created: ${body.name || mlxId}`).run();
+          }
+        }
         return json(data, res.status);
       }
 
@@ -617,6 +635,14 @@ export default {
           body: JSON.stringify({ profile_id: profileId }),
         });
         const data = await res.json();
+        // Update D1 ops_profiles record with status and timestamp
+        if (res.ok) {
+          const newStatus = action === 'start' ? 'running' : 'stopped';
+          const tsCol = action === 'start' ? 'last_started_at' : 'last_stopped_at';
+          await db.prepare(`UPDATE ops_profiles SET mlx_status = ?, ${tsCol} = datetime('now') WHERE ml_profile_id = ?`)
+            .bind(newStatus, profileId).run();
+          await db.prepare('INSERT INTO ops_logs (id, msg) VALUES (?, ?)').bind(uid(), `MLX profile ${action}: ${profileId}`).run();
+        }
         return json(data, res.status);
       }
 
@@ -633,6 +659,159 @@ export default {
         });
         const data = await res.json();
         return json(data, res.status);
+      }
+
+      // ═══ MLX: AUTOMATION TOKEN ═══
+      if (path === '/api/mlx/automation-token' && method === 'POST') {
+        const ml = await getMlSettings(db);
+        if (!ml.mlToken) return json({ error: 'Multilogin token not configured' }, 400);
+        const res = await fetch('https://api.multilogin.com/workspace/automation_token?expiration_period=30d', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ml.mlToken}` },
+        });
+        const data = await res.json();
+        if (res.ok && data.data?.token) {
+          await db.prepare(`
+            INSERT INTO settings (key, value, updated_at) VALUES ('mlAutomationToken', ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')
+          `).bind(data.data.token, data.data.token).run();
+          await db.prepare('INSERT INTO ops_logs (id, msg) VALUES (?, ?)').bind(uid(), 'MLX automation token generated').run();
+        }
+        return json(data, res.status);
+      }
+
+      // ═══ MLX: FOLDERS ═══
+      if (path === '/api/mlx/folders' && method === 'GET') {
+        const ml = await getMlSettings(db);
+        if (!ml.mlToken) return json({ error: 'Multilogin token not configured' }, 400);
+        const res = await fetch('https://api.multilogin.com/folder', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ml.mlToken}` },
+        });
+        const data = await res.json();
+        return json(data, res.status);
+      }
+
+      // ═══ MLX: UPDATE PROFILE ═══
+      if (path === '/api/mlx/profiles/update' && method === 'PATCH') {
+        const ml = await getMlSettings(db);
+        if (!ml.mlToken) return json({ error: 'Multilogin token not configured' }, 400);
+        const body = await request.json();
+        const res = await fetch('https://api.multilogin.com/profile/update', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ml.mlToken}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        // Also update D1 ops_profiles record if profile_id is provided
+        if (res.ok && body.profile_id) {
+          const sets = [];
+          const vals = [];
+          if (body.name) { sets.push('name = ?'); vals.push(body.name); }
+          if (body.parameters?.proxy) {
+            const p = body.parameters.proxy;
+            if (p.host) { sets.push('proxy_host = ?'); vals.push(p.host); }
+            if (p.port) { sets.push('proxy_port = ?'); vals.push(p.port); }
+            if (p.username) { sets.push('proxy_user = ?'); vals.push(p.username); }
+            if (p.password) { sets.push('proxy_pass = ?'); vals.push(p.password); }
+            if (p.type) { sets.push('proxy_type = ?'); vals.push(p.type); }
+          }
+          if (body.parameters?.fingerprint?.os) { sets.push('fingerprint_os = ?'); vals.push(body.parameters.fingerprint.os); }
+          if (sets.length > 0) {
+            vals.push(body.profile_id);
+            await db.prepare(`UPDATE ops_profiles SET ${sets.join(', ')} WHERE ml_profile_id = ?`).bind(...vals).run();
+          }
+          await db.prepare('INSERT INTO ops_logs (id, msg) VALUES (?, ?)').bind(uid(), `MLX profile updated: ${body.profile_id}`).run();
+        }
+        return json(data, res.status);
+      }
+
+      // ═══ MLX: DELETE PROFILE ═══
+      if (path === '/api/mlx/profiles/delete' && method === 'DELETE') {
+        const ml = await getMlSettings(db);
+        if (!ml.mlToken) return json({ error: 'Multilogin token not configured' }, 400);
+        const body = await request.json();
+        const res = await fetch('https://api.multilogin.com/profile/remove', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ml.mlToken}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        // Also delete matching D1 records where ml_profile_id is in the provided ids
+        if (res.ok && body.ids?.length) {
+          const placeholders = body.ids.map(() => '?').join(', ');
+          await db.prepare(`DELETE FROM ops_profiles WHERE ml_profile_id IN (${placeholders})`).bind(...body.ids).run();
+          await db.prepare('INSERT INTO ops_logs (id, msg) VALUES (?, ?)').bind(uid(), `MLX profiles deleted: ${body.ids.length} profiles`).run();
+        }
+        return json(data, res.status);
+      }
+
+      // ═══ MLX: ACTIVE PROFILES ═══
+      if (path === '/api/mlx/profiles/active' && method === 'GET') {
+        const { results } = await db.prepare("SELECT * FROM ops_profiles WHERE mlx_status = 'running' ORDER BY last_started_at DESC").all();
+        return json(results.map(snakeToCamel));
+      }
+
+      // ═══ MLX: SYNC PROFILES ═══
+      if (path === '/api/mlx/profiles/sync' && method === 'POST') {
+        const ml = await getMlSettings(db);
+        if (!ml.mlToken) return json({ error: 'Multilogin token not configured' }, 400);
+        if (!ml.mlFolderId) return json({ error: 'Multilogin folder ID not configured' }, 400);
+
+        // 1. Fetch all MLX profiles from API
+        let allMlxProfiles = [];
+        let offset = 0;
+        const limit = 100;
+        while (true) {
+          const res = await fetch(`https://api.multilogin.com/profile/list?folder_id=${ml.mlFolderId}&limit=${limit}&offset=${offset}`, {
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ml.mlToken}` },
+          });
+          const page = await res.json();
+          if (!res.ok) return json({ error: 'Failed to fetch MLX profiles', details: page }, res.status);
+          const profiles = page.data?.profiles || [];
+          allMlxProfiles = allMlxProfiles.concat(profiles);
+          if (profiles.length < limit) break;
+          offset += limit;
+        }
+
+        // 2. Fetch all D1 ops_profiles
+        const { results: d1Profiles } = await db.prepare('SELECT * FROM ops_profiles').all();
+        const d1ByMlxId = {};
+        d1Profiles.forEach(p => { if (p.ml_profile_id) d1ByMlxId[p.ml_profile_id] = p; });
+
+        const mlxIdSet = new Set(allMlxProfiles.map(p => p.uuid));
+        let created = 0;
+        let updated = 0;
+        let deleted = 0;
+
+        // 3. For each MLX profile not in D1, INSERT
+        for (const mlxP of allMlxProfiles) {
+          if (!d1ByMlxId[mlxP.uuid]) {
+            const id = uid();
+            const proxy = mlxP.parameters?.proxy || {};
+            await db.prepare(
+              'INSERT INTO ops_profiles (id, name, ml_profile_id, ml_folder_id, browser_type, os, proxy_host, proxy_port, proxy_user, proxy_pass, proxy_type, fingerprint_os, mlx_status, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            ).bind(
+              id, mlxP.name || '', mlxP.uuid, mlxP.folder_id || ml.mlFolderId,
+              mlxP.browser_type || '', mlxP.parameters?.fingerprint?.os || '',
+              proxy.host || '', proxy.port || '', proxy.username || '', proxy.password || '',
+              proxy.type || '', mlxP.parameters?.fingerprint?.os || '',
+              'stopped', 'active'
+            ).run();
+            created++;
+          }
+        }
+
+        // 4. For each D1 profile whose ml_profile_id no longer exists in MLX, mark deleted
+        for (const d1P of d1Profiles) {
+          if (d1P.ml_profile_id && !mlxIdSet.has(d1P.ml_profile_id)) {
+            await db.prepare("UPDATE ops_profiles SET status = 'deleted' WHERE id = ?").bind(d1P.id).run();
+            deleted++;
+          }
+        }
+
+        await db.prepare('INSERT INTO ops_logs (id, msg) VALUES (?, ?)').bind(uid(), `MLX sync: created=${created}, updated=${updated}, deleted=${deleted}`).run();
+        return json({ success: true, created, updated, deleted });
       }
 
       return json({ error: 'Not found' }, 404);
