@@ -20,6 +20,8 @@ export function Settings({ settings, setSettings, stats }) {
     const [generatingToken, setGeneratingToken] = useState(false);
     const [testing, setTesting] = useState(null);
     const [testResult, setTestResult] = useState({});
+    const [folders, setFolders] = useState(null);
+    const [loadingFolders, setLoadingFolders] = useState(false);
 
     const testApi = async () => {
         setTesting("api");
@@ -168,7 +170,35 @@ export function Settings({ settings, setSettings, stats }) {
                 </div>
                 <div style={{ marginBottom: 8 }}>
                     <label style={labelStyle}>Default Folder ID</label>
-                    <Inp value={mlFolderId} onChange={setMlFolderId} placeholder="Folder ID for browser profiles" />
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <Inp value={mlFolderId} onChange={setMlFolderId} placeholder="Folder ID for browser profiles" style={{ flex: 1 }} />
+                        <Btn variant="ghost" onClick={async () => {
+                            setLoadingFolders(true);
+                            try {
+                                const res = await multiloginApi.getFolders();
+                                if (res.data) setFolders(res.data);
+                                else setFolders([]);
+                            } catch { setFolders([]); }
+                            setLoadingFolders(false);
+                        }} disabled={loadingFolders} style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                            {loadingFolders ? "..." : "📂 Browse"}
+                        </Btn>
+                    </div>
+                    {folders && (
+                        <div style={{ marginTop: 6, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 6, padding: 8, maxHeight: 160, overflowY: "auto" }}>
+                            {folders.length === 0 ? (
+                                <div style={{ fontSize: 11, color: T.muted }}>No folders found. Save your token first, then try again.</div>
+                            ) : folders.map(f => (
+                                <div key={f.folder_id || f.id} onClick={() => { setMlFolderId(f.folder_id || f.id); setFolders(null); }}
+                                    style={{ padding: "6px 8px", cursor: "pointer", borderRadius: 4, fontSize: 12, display: "flex", justifyContent: "space-between", alignItems: "center", ":hover": {} }}
+                                    onMouseEnter={e => e.currentTarget.style.background = T.border}
+                                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                    <span style={{ fontWeight: 500 }}>{f.name || "Unnamed"}</span>
+                                    <span style={{ fontSize: 10, color: T.muted, fontFamily: "monospace" }}>{(f.folder_id || f.id || "").slice(0, 12)}...</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div style={{ marginBottom: 12 }}>
                     <label style={labelStyle}>Default Proxy Provider</label>

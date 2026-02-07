@@ -33,6 +33,12 @@ async function getMlSettings(db) {
   return s;
 }
 
+async function md5(text) {
+  const data = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('MD5', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 function camelToSnake(str) {
   return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 }
@@ -550,10 +556,11 @@ export default {
       if (path === '/api/ml/signin' && method === 'POST') {
         const ml = await getMlSettings(db);
         if (!ml.mlEmail || !ml.mlPassword) return json({ error: 'Multilogin email/password not configured' }, 400);
+        const hashedPassword = await md5(ml.mlPassword);
         const res = await fetch('https://api.multilogin.com/user/signin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: ml.mlEmail, password: ml.mlPassword }),
+          body: JSON.stringify({ email: ml.mlEmail, password: hashedPassword }),
         });
         const data = await res.json();
         if (data.data?.token) {
